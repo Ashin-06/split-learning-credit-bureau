@@ -128,7 +128,10 @@
           Elliptic-Curve Diffie-Hellman PSI + 3-Party Vertical SplitNN + Cut-Layer Feature-Inversion Defense
         </div>
       </div>
-      <div class="badge">FastAPI Port 8017 &bull; Zero Raw Feature Sharing</div>
+      <div>
+        <input type="password" id="apiKey" placeholder="X-API-Key (if set)" autocomplete="off" />
+        <div class="badge">Port 8017 &bull; Single-process demo on synthetic data</div>
+      </div>
     </header>
 
     <!-- Benchmark & Model Comparison Table -->
@@ -212,22 +215,38 @@
   </div>
 
   <script>
+    function esc(v) {
+      return String(v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    async function api(path, opts = {}) {
+      const key = document.getElementById('apiKey').value;
+      const headers = { ...(opts.headers || {}) };
+      if (key) headers['X-API-Key'] = key;
+      const res = await fetch(path, { ...opts, headers });
+      const body = await res.json();
+      if (!res.ok) throw new Error(JSON.stringify(body.detail));
+      return body;
+    }
+
     async function runPSI() {
       const bank_ids = document.getElementById('psi-bank').value.split(',').map(s => s.trim()).filter(Boolean);
       const upi_ids = document.getElementById('psi-upi').value.split(',').map(s => s.trim()).filter(Boolean);
       const telecom_ids = document.getElementById('psi-tel').value.split(',').map(s => s.trim()).filter(Boolean);
-      const res = await fetch('/psi/align', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ bank_ids, upi_ids, telecom_ids })
-      });
-      const data = await res.json();
+      let data;
+      try {
+        data = await api('/psi/align', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ bank_ids, upi_ids, telecom_ids })
+        });
+      } catch (e) { document.getElementById('psi-out').textContent = 'Error: ' + e.message; return; }
       const r = data.result;
       document.getElementById('psi-out').innerHTML = `
         <div class="metric-row"><span>Aligned Common Cohort Size</span><span class="metric-val good">${r.intersection_size} customers</span></div>
         <div class="metric-row"><span>Exact Intersection Recovery</span><span class="metric-val good">${(r.exact_recovery_rate * 100).toFixed(1)}%</span></div>
         <div class="metric-row"><span>Aligned Bank / UPI / Telecom Indices</span><span class="metric-val">[${r.aligned_indices_bank.join(', ')}] &harr; [${r.aligned_indices_upi.join(', ')}] &harr; [${r.aligned_indices_telecom.join(', ')}]</span></div>
-        <div class="metric-row"><span>Double-Blinded Token Sample (v_i)</span><span class="metric-val">${r.pairwise_bank_upi.aligned_double_blinded_tokens_hex[0] || 'N/A'}</span></div>
+        <div class="metric-row"><span>Double-Blinded Token Sample (v_i)</span><span class="metric-val">${esc(r.pairwise_bank_upi.aligned_double_blinded_tokens_hex[0] || 'N/A')}</span></div>
       `;
     }
 
@@ -247,28 +266,32 @@
         electricity_ontime_ratio: parseFloat(document.getElementById('f-ele').value),
         device_price_tier: parseFloat(document.getElementById('f-dev').value),
       };
-      const res = await fetch('/score', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      const d = await res.json();
+      let d;
+      try {
+        d = await api('/score', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+      } catch (e) { document.getElementById('score-out').textContent = 'Error: ' + e.message; return; }
       document.getElementById('score-out').innerHTML = `
         <div class="metric-row"><span>3-Party SplitNN Default Probability</span><span class="metric-val warn">${(d.splitnn_default_probability * 100).toFixed(2)}%</span></div>
-        <div class="metric-row"><span>Single-Party (Bank Alone) Probability</span><span class="metric-val">${(d.bank_only_default_probability * 100).toFixed(2)}%</span></div>
-        <div class="metric-row"><span>SplitBureau Credit Score (300-900)</span><span class="metric-val good">${d.bureau_credit_score} (${d.risk_tier})</span></div>
-        <div class="metric-row"><span>Underwriting Decision</span><span class="metric-val">${d.recommended_decision}</span></div>
+        <div class="metric-row"><span>Same Model, External Embeddings Zeroed</span><span class="metric-val">${(d.external_embeddings_zeroed_probability * 100).toFixed(2)}%</span></div>
+        <div class="metric-row"><span>Illustrative Score (300-900)</span><span class="metric-val good">${d.bureau_credit_score} (${esc(d.risk_tier)})</span></div>
+        <div class="metric-row"><span>Illustrative Decision</span><span class="metric-val">${esc(d.recommended_decision)}</span></div>
+        <div class="metric-row"><span>Note</span><span class="metric-val">${esc(d.note)}</span></div>
         <div class="metric-row"><span>Cut-Layer L2 Norms (UPI / Telecom)</span><span class="metric-val">${d.cut_layer_telemetry.z_upi_norm} / ${d.cut_layer_telemetry.z_telecom_norm}</span></div>
       `;
     }
 
     async function loadBenchmark() {
       document.getElementById('bench-status').innerText = 'Running 3-Party DH-PSI + Vertical SplitNN Training + Inversion Attack...';
-      const res = await fetch('/bench');
-      const b = await res.json();
+      let b;
+      try { b = await api('/bench'); }
+      catch (e) { document.getElementById('bench-status').textContent = 'Error: ' + e.message; return; }
       document.getElementById('bench-status').innerHTML = `
         DH-PSI aligned <strong>${b.psi_result.intersection_size}</strong> common customers (${(b.psi_result.exact_recovery_rate*100).toFixed(1)}% recovery) in ${b.psi_result.elapsed_ms} ms.
-        ROC-AUC Gain over Bank-Only: <strong class="good">+${b.roc_auc_gain_over_bank}</strong> &bull; Attacker R&sup2; Slashed: <strong class="good">${b.unprotected_inversion.overall_mean_r2} &rarr; ${b.defended_inversion.overall_mean_r2}</strong>.
+        ROC-AUC Gain over Bank-Only: <strong class="good">+${b.roc_auc_gain_over_bank}</strong> &bull; ROC-AUC cost of the defence: <strong>${b.roc_auc_drop_vs_unprotected}</strong> &bull; Attacker R&sup2;: <strong class="good">${b.unprotected_inversion.overall_mean_r2} &rarr; ${b.defended_inversion.overall_mean_r2}</strong>.
       `;
       const rows = [
         {
@@ -316,7 +339,7 @@
           <td class="metric-val">${r.brier.toFixed(4)}</td>
           <td class="metric-val ${r.r2 > 0.5 ? 'bad' : 'good'}">${r.r2.toFixed(4)}</td>
           <td class="metric-val">${r.dcor}</td>
-          <td><span class="${r.r2 > 0.5 ? 'bad' : 'good'}">${r.verdict}</span></td>
+          <td><span class="${r.r2 > 0.5 ? 'bad' : 'good'}">${esc(r.verdict)}</span></td>
         </tr>
       `).join('');
     }

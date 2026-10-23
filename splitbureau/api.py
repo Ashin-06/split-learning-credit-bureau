@@ -8,16 +8,27 @@ Endpoints:
   - POST /train     : Train Vertical SplitNN with configurable Cut-Layer Privacy Defense
   - POST /score     : Score a borrower via 3-party Cut-Layer embeddings (never sharing raw features)
   - GET  /bench     : Run & return full benchmark suite metrics
+
+This is a single-process demo: the server plays all three institutions, so /score and /train
+receive every party's raw features. In a real deployment each party runs its own bottom network
+and sends only its cut-layer embedding.
+
+Set SPLITBUREAU_API_KEY to require it in the X-API-Key header on every endpoint except / and
+/health (unset = open, for local use; `python -m splitbureau serve` refuses a non-loopback host
+without it).
 """
 
 from __future__ import annotations
 
 import dataclasses
+import hmac
+import os
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -47,6 +58,24 @@ app = FastAPI(
 )
 
 _CONSOLE_HTML_PATH = Path(__file__).resolve().parent.parent / "web" / "console.html"
+API_KEY = os.environ.get("SPLITBUREAU_API_KEY")
+MAX_BODY_BYTES = 1_000_000
+MAX_PSI_IDS = 2_000
+_TRAIN_LOCK = threading.Lock()  # training replaces the shared model; one at a time
+
+
+def require_key(x_api_key: str | None = Header(default=None)) -> None:
+    if API_KEY and not hmac.compare_digest(x_api_key or "", API_KEY):
+        raise HTTPException(401, "missing or wrong X-API-Key")
+
+
+@app.middleware("http")
+async def limit_body(request: Request, call_next):
+    if request.method == "POST":
+        length = request.headers.get("content-length", "")
+        if not length.isdigit() or int(length) > MAX_BODY_BYTES:
+            return JSONResponse({"detail": "body missing Content-Length or over 1 MB"}, status_code=413)
+    return await call_next(request)
 
 
 class BureauState:
@@ -91,6 +120,7 @@ STATE = BureauState()
 
 class PSIAlignRequest(BaseModel):
     bank_ids: List[str] = Field(
+        max_length=MAX_PSI_IDS,
         default_factory=lambda: [
             "PAN_COMMON_00001",
             "PAN_COMMON_00002",
@@ -100,6 +130,7 @@ class PSIAlignRequest(BaseModel):
         ]
     )
     upi_ids: List[str] = Field(
+        max_length=MAX_PSI_IDS,
         default_factory=lambda: [
             "PAN_UPI_ONLY_501",
             "PAN_COMMON_00003",
@@ -109,6 +140,7 @@ class PSIAlignRequest(BaseModel):
         ]
     )
     telecom_ids: Optional[List[str]] = Field(
+        max_length=MAX_PSI_IDS,
         default_factory=lambda: [
             "PAN_COMMON_00002",
             "PAN_TEL_ONLY_701",
@@ -119,8 +151,8 @@ class PSIAlignRequest(BaseModel):
 
 
 class TrainSplitNNRequest(BaseModel):
-    n_samples: int = Field(default=800, ge=200, le=3000)
-    epochs: int = Field(default=140, ge=20, le=400)
+    n_samples: int = Field(default=800, ge=200, le=2000)
+    epochs: int = Field(default=140, ge=20, le=200)
     clip_norm: float = Field(default=0.95, ge=0.2, le=20.0)
     decorr_lambda: float = Field(default=0.55, ge=0.0, le=5.0)
     noise_sigma: float = Field(default=0.45, ge=0.0, le=2.0)
@@ -128,9 +160,9 @@ class TrainSplitNNRequest(BaseModel):
 
 
 class ScoreBorrowerRequest(BaseModel):
-    customer_id: str = "PAN_COMMON_00042"
+    customer_id: str = Field("PAN_COMMON_00042", max_length=64)
     # Party 1 (Bank) features
-    savings_balance: float = Field(default=2.4, description="Savings balance in INR Lakhs")
+    savings_balance: float = Field(default=2.4, ge=0.0, le=1000.0, allow_inf_nan=False, description="Savings balance in INR Lakhs")
     salary_regularity: float = Field(default=0.72, ge=0.0, le=1.0)
     bounce_count: float = Field(default=1.0, ge=0.0, le=20.0)
     credit_utilization: float = Field(default=0.58, ge=0.0, le=1.0)
@@ -170,8 +202,10 @@ def health() -> Dict[str, Any]:
     }
 
 
-@app.post("/psi/align")
+@app.post("/psi/align", dependencies=[Depends(require_key)])
 def psi_align(req: PSIAlignRequest) -> Dict[str, Any]:
+    if any(len(i) > 64 for ids in (req.bank_ids, req.upi_ids, req.telecom_ids or []) for i in ids):
+        raise HTTPException(status_code=422, detail="identifiers are limited to 64 characters")
     if req.telecom_ids is not None and len(req.telecom_ids) > 0:
         res3 = align_three_parties(req.bank_ids, req.upi_ids, req.telecom_ids)
         matched_ids = [req.bank_ids[i] for i in res3.aligned_indices_bank]
@@ -189,8 +223,17 @@ def psi_align(req: PSIAlignRequest) -> Dict[str, Any]:
     }
 
 
-@app.post("/train")
+@app.post("/train", dependencies=[Depends(require_key)])
 def train_endpoint(req: TrainSplitNNRequest) -> Dict[str, Any]:
+    if not _TRAIN_LOCK.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="a training run is already in progress")
+    try:
+        return _train(req)
+    finally:
+        _TRAIN_LOCK.release()
+
+
+def _train(req: TrainSplitNNRequest) -> Dict[str, Any]:
     ds = generate_vertical_credit_dataset(n_samples=req.n_samples, seed=req.seed)
     bank_metrics, _ = train_bank_only_baseline(
         ds.x_bank_train,
@@ -297,7 +340,7 @@ def train_endpoint(req: TrainSplitNNRequest) -> Dict[str, Any]:
     }
 
 
-@app.post("/score")
+@app.post("/score", dependencies=[Depends(require_key)])
 def score_borrower(req: ScoreBorrowerRequest) -> Dict[str, Any]:
     STATE.ensure_initialized()
     assert STATE.dataset is not None and STATE.defended_model is not None
@@ -326,7 +369,8 @@ def score_borrower(req: ScoreBorrowerRequest) -> Dict[str, Any]:
     z_concat = np.hstack([z1, z2, z3])
     prob_default = float(model.top_net.forward(z_concat, training=False)[0])
 
-    # Compute Bank-only comparison score (zeroing external embeddings)
+    # The same top network with the other parties' embeddings zeroed. This is not a model
+    # trained on bank data alone, only a rough view of how much the external parties move the score.
     z_bank_only = np.hstack([z1, np.zeros_like(z2), np.zeros_like(z3)])
     prob_bank_only = float(model.top_net.forward(z_bank_only, training=False)[0])
 
@@ -347,7 +391,7 @@ def score_borrower(req: ScoreBorrowerRequest) -> Dict[str, Any]:
     return {
         "customer_id": req.customer_id,
         "splitnn_default_probability": round(prob_default, 4),
-        "bank_only_default_probability": round(prob_bank_only, 4),
+        "external_embeddings_zeroed_probability": round(prob_bank_only, 4),
         "multi_party_risk_shift": round(prob_default - prob_bank_only, 4),
         "bureau_credit_score": credit_score,
         "risk_tier": tier,
@@ -358,12 +402,15 @@ def score_borrower(req: ScoreBorrowerRequest) -> Dict[str, Any]:
             "z_telecom_norm": round(float(np.linalg.norm(z3)), 4),
             "z_upi_embedding_preview": [round(float(v), 4) for v in z2[0, :4]],
             "z_telecom_embedding_preview": [round(float(v), 4) for v in z3[0, :4]],
-            "raw_features_shared_across_wire": False,
         },
+        "note": (
+            "Demo only: this server received all three parties' raw features. The model is trained "
+            "on synthetic data; the score, tier and decision are illustrative, not a credit decision."
+        ),
     }
 
 
-@app.get("/bench")
+@app.get("/bench", dependencies=[Depends(require_key)])
 def get_benchmark() -> JSONResponse:
     if STATE.cached_bench is None:
         STATE.cached_bench = run_full_benchmark(n_common=900, epochs=160, seed=42)

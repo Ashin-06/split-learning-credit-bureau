@@ -59,6 +59,7 @@ def test_api_endpoints() -> None:
     assert r.status_code == 200 and len(r.json()["matched_customer_ids_order"]) == 3
     r = client.post("/score", json={})
     assert r.status_code == 200 and 0.0 <= r.json()["splitnn_default_probability"] <= 1.0
+    assert "raw_features_shared_across_wire" not in r.json()["cut_layer_telemetry"]
 
 
 def test_psi_points_are_in_the_prime_subgroup_and_scalars_are_fresh() -> None:
@@ -91,3 +92,18 @@ def test_defence_reduces_leakage_against_the_stronger_attacker(dataset) -> None:
     # Even without any raw-feature shortcut, an 8-d embedding of 4 features is nearly invertible
     assert plain > 0.7
     assert defended < plain - 0.4
+
+
+def test_api_key_and_limits(monkeypatch) -> None:
+    import splitbureau.api as api
+
+    client = TestClient(app)
+    monkeypatch.setattr(api, "API_KEY", "s3cret")
+    assert client.post("/score", json={}).status_code == 401
+    assert client.get("/health").status_code == 200
+    hdr = {"X-API-Key": "s3cret"}
+    assert client.post("/score", json={"savings_balance": -1}, headers=hdr).status_code == 422
+    big = {"bank_ids": [f"ID{i}" for i in range(api.MAX_PSI_IDS + 1)], "upi_ids": ["a"]}
+    assert client.post("/psi/align", json=big, headers=hdr).status_code == 422
+    assert client.post("/psi/align", json={"bank_ids": ["x" * 65], "upi_ids": ["a"]}, headers=hdr).status_code == 422
+    assert client.post("/train", json={"epochs": 1000}, headers=hdr).status_code == 422
