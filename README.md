@@ -1,0 +1,77 @@
+# Split-Learning Credit Bureau (`splitbureau`)
+
+Three institutions hold different facts about the same customers: a bank (balances, salary regularity, bounces, utilisation, plus the default label), a UPI payments app (spend diversity, late-night betting share, P2P velocity, BNPL rollovers), and a telecom/utility provider (SIM tenure, recharge regularity, on-time electricity payments, handset tier). This project shows how they could train one default model without pooling raw data:
+
+1. **Private set intersection** (`psi.py`) finds the customers all three share without exchanging the ID lists.
+2. **Split learning** (`splitnn.py`): each party runs a small bottom network on its own features and sends only the resulting embedding. The bank's top network combines the embeddings and sends gradients back.
+3. **A cut-layer defence**: a low-rank bottleneck, norm clipping, a cross-covariance penalty and Gaussian noise. It limits how much a curious bank can reconstruct of the other parties' features from their embeddings. `inversion.py` measures this by attacking it.
+
+Everything runs in one process on **synthetic data** (`data.py`), with all three parties simulated. Defaults are a deterministic function of the generated features plus a little noise, so the absolute AUCs are much higher than any real bureau would see.
+
+> **The PSI is a reference implementation.** It uses libsodium's Ed25519 group arithmetic, but the protocol code is hand-written and unreviewed, and it is secure only against parties who follow it (semi-honest).
+
+## How it works
+
+**PSI.**
+- Each ID is hashed onto Ed25519: a SHA-512 try-and-increment candidate, multiplied by the cofactor 8 so it lies in the prime-order subgroup.
+- Each party blinds its points with a fresh random scalar, and the bank compares the double-blinded tokens.
+- A token match means an ID match. The tests check that hashed points really are in the prime-order subgroup.
+
+What it reveals: both sides learn the intersection size, and the bank learns which of its rows are in it. In the three-party flow the bank runs two pairwise PSIs, so it learns its overlap with each party separately, not just the three-way overlap.
+
+**Split network.**
+- Bottom networks: 4 features → 16 hidden units (tanh) → 8-dimensional embedding. The top network is one hidden layer plus a linear skip.
+- Training is plain mini-batch SGD written in NumPy.
+- The defence for the UPI and telecom parties has four parts:
+  - a rank-1 bottleneck, so each party effectively sends one number spread over 8 dimensions;
+  - L2 clipping to norm 0.95;
+  - a cross-covariance penalty between features and embedding;
+  - Gaussian noise with σ = 0.45.
+- The noise is a fixed setting. It is **not calibrated to a differential-privacy budget**, and no ε is claimed.
+
+**Attack.** The bank is assumed to know the raw features of the training customers (a generous assumption) and fits two decoders from embedding to features: ridge regression on a quadratic basis, and a 64-64 MLP. Leakage is the better decoder's held-out R², averaged over the UPI and telecom features.
+
+## Results
+
+`python -m splitbureau bench --ablation` (900 shared customers, 160 epochs, seed 42):
+
+| Model | ROC-AUC | PR-AUC | Attacker R² |
+|---|---|---|---|
+| Bank's own 4 features | 0.703 | 0.617 | – |
+| Split network, no defence | 0.976 | 0.969 | 0.954 |
+| Split network, full defence | 0.867 | 0.841 | 0.134 |
+| All 12 features pooled in one place | 0.986 | 0.981 | – |
+
+PSI found exactly the 900 shared customers among 1,080 / 1,140 / 1,110 records, in about 5 seconds.
+
+| Defence ablation | ROC-AUC | Attacker R² |
+|---|---|---|
+| none | 0.976 | 0.954 |
+| rank-1 bottleneck only | 0.932 | 0.233 |
+| bottleneck + clipping + penalty | 0.933 | 0.229 |
+| bottleneck + noise | 0.865 | 0.137 |
+| full defence | 0.867 | 0.134 |
+
+What this shows:
+- An undefended 8-dimensional embedding of 4 features is nearly invertible (R² 0.95).
+- Most of the protection comes from sending a single number per party instead of a rich embedding. Clipping and the penalty add nothing measurable here, and the noise buys a further drop in R² at a real cost in accuracy.
+- Low R² means these two decoders fail. It is not a proof that nothing leaks; a stronger attacker, or one that also uses the gradients, could recover more.
+
+## Run it
+
+```bash
+pip install -r requirements.txt
+python -m pytest -q                            # 8 tests
+python -m splitbureau bench --ablation         # about 40 s
+python -m splitbureau serve --port 8017        # API + console at http://127.0.0.1:8017
+```
+
+Endpoints: `POST /psi/align`, `POST /train`, `POST /score`, `GET /bench`, `GET /health`. Set `SPLITBUREAU_API_KEY` to require it in the `X-API-Key` header (the console has a field for it). Without the key the server runs open, and `serve` refuses to bind a non-loopback address. The server plays all three parties, so `/score` and `/train` do receive every party's raw features. The score, tier and decision it returns are illustrative only.
+
+## Limits
+
+- **Synthetic data and simulated parties.** There is no network transport, no separate deployments and no real data. A public dataset with columns split into three "parties" (for example UCI's Default of Credit Card Clients) would give more realistic AUCs, but this has not been done.
+- **No formal privacy guarantee.** There's no differential-privacy accounting and only two attack decoders. Label leakage through the gradients the bank sends back is not addressed.
+- **Semi-honest PSI only.** A malicious party could send malformed tokens or lie about its set, and hashing is not constant-time.
+- **Features have fairness and legal problems.** Late-night betting share, handset price tier and similar alternative data raise discrimination and consent issues that a real lender would need to clear with regulators and fair-lending review before use.
+- **No deployment story**: no TLS, no per-party authentication, no model versioning or audit trail.
