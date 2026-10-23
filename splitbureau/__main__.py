@@ -14,7 +14,7 @@ from typing import Sequence
 
 import uvicorn
 
-from .bench import format_benchmark_report, run_full_benchmark
+from .bench import format_ablation, format_benchmark_report, run_ablation, run_full_benchmark
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -29,6 +29,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     bench_p.add_argument("--epochs", type=int, default=160, help="Training epochs")
     bench_p.add_argument("--seed", type=int, default=42, help="Random seed")
     bench_p.add_argument("--json", action="store_true", help="Emit JSON output")
+    bench_p.add_argument("--ablation", action="store_true", help="Also run the defence ablation")
 
     serve_p = sub.add_parser("serve", help="Start FastAPI server")
     serve_p.add_argument("--host", type=str, default="127.0.0.1")
@@ -54,6 +55,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(summary.to_dict(), indent=2))
     else:
         print(format_benchmark_report(summary))
+    if getattr(args, "ablation", False):
+        print(format_ablation(run_ablation(n_common=samples, epochs=epochs, seed=seed)))
     return 0 if summary.all_assertions_passed else 1
 
 

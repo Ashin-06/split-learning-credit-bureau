@@ -223,6 +223,39 @@ def run_full_benchmark(
     )
 
 
+ABLATION_CONFIGS = {
+    "no defence": dict(enabled=False),
+    "rank-1 bottleneck only": dict(enabled=True, clip_norm=100.0, decorr_lambda=0.0, noise_sigma=0.0),
+    "bottleneck + clipping + penalty": dict(enabled=True, noise_sigma=0.0),
+    "bottleneck + noise only": dict(enabled=True, clip_norm=100.0, decorr_lambda=0.0),
+    "full defence": dict(enabled=True),
+}
+
+
+def run_ablation(n_common: int = 900, epochs: int = 160, seed: int = 42) -> Dict[str, Dict[str, float]]:
+    """Which part of the cut-layer defence buys the privacy, and what it costs in ROC-AUC."""
+    registries = generate_unaligned_registries(n_common=n_common, seed=seed)
+    ds, _ = build_aligned_dataset_from_registries(registries, test_fraction=0.25, seed=seed)
+    out: Dict[str, Dict[str, float]] = {}
+    for name, kw in ABLATION_CONFIGS.items():
+        model = SplitCreditNet(defense_config=CutLayerDefenseConfig(**kw), seed=seed)
+        model.fit(ds.x_bank_train, ds.x_upi_train, ds.x_telecom_train, ds.y_train, epochs=epochs)
+        metrics = model.evaluate(ds.x_bank_test, ds.x_upi_test, ds.x_telecom_test, ds.y_test)
+        leak = evaluate_cut_layer_leakage(
+            model, ds.x_bank_train, ds.x_upi_train, ds.x_telecom_train,
+            ds.x_bank_test, ds.x_upi_test, ds.x_telecom_test,
+        )
+        out[name] = {"roc_auc": metrics.roc_auc, "attacker_r2": leak.overall_mean_r2}
+    return out
+
+
+def format_ablation(rows: Dict[str, Dict[str, float]]) -> str:
+    lines = [f"  {'configuration':<34} {'ROC-AUC':>8} {'attacker R^2':>13}"]
+    for name, r in rows.items():
+        lines.append(f"  {name:<34} {r['roc_auc']:>8.4f} {r['attacker_r2']:>13.4f}")
+    return "\n".join(lines)
+
+
 def format_benchmark_report(summary: BenchmarkSummary) -> str:
     """Format a human-readable ASCII table & JSON report of the benchmark run."""
     lines = [
