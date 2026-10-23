@@ -6,7 +6,7 @@ Three institutions hold different facts about the same customers: a bank (balanc
 2. **Split learning** (`splitnn.py`): each party runs a small bottom network on its own features and sends only the resulting embedding. The bank's top network combines the embeddings and sends gradients back.
 3. **A cut-layer defence**: a low-rank bottleneck, norm clipping, a cross-covariance penalty and Gaussian noise. It limits how much a curious bank can reconstruct of the other parties' features from their embeddings. `inversion.py` measures this by attacking it.
 
-Everything runs in one process on **synthetic data** (`data.py`), with all three parties simulated. Defaults are a deterministic function of the generated features plus a little noise, so the absolute AUCs are much higher than any real bureau would see.
+Everything runs in one process on **synthetic data** (`data.py`), with all three parties simulated. Defaults are a deterministic function of the generated features plus a little noise, so the absolute AUCs are much higher than any real bureau would see. See "Real data" for the same models on real card-holder data.
 
 > **The PSI is a reference implementation.** It uses libsodium's Ed25519 group arithmetic, but the protocol code is hand-written and unreviewed, and it is secure only against parties who follow it (semi-honest).
 
@@ -57,12 +57,31 @@ What this shows:
 - Most of the protection comes from sending a single number per party instead of a rich embedding. Clipping and the penalty add nothing measurable here, and the noise buys a further drop in R² at a real cost in accuracy.
 - Low R² means these two decoders fail. It is not a proof that nothing leaks; a stronger attacker, or one that also uses the gradients, could recover more.
 
+## Real data
+
+`python -m splitbureau realdata --data "default of credit card clients.xls"` trains the same models on UCI's Default of Credit Card Clients data: 30,000 card holders at a Taiwanese bank in 2005, 22.1% of whom defaulted the next month (CC BY 4.0). Results are in `results/real_data.json`.
+- **How the parties are formed.** All the columns come from one bank, so they are split three ways. The bank keeps the credit limit, education, marital status and age, plus the label. A "bureau" holds six months of repayment status. A "payments" party holds six monthly bill amounts and six payment amounts. Sex is left out. The rows are already aligned, so PSI is skipped.
+- **How it is tested.** A 75/25 train/test split (7,500 test rows), features standardised on the training rows, amounts log-scaled. Every model setting is the synthetic benchmark's, unchanged; nothing was tuned on this data.
+
+| Model | ROC-AUC | PR-AUC | Attacker R² |
+|---|---|---|---|
+| Bank's own 4 features | 0.623 | 0.300 | – |
+| Split network, no defence | 0.769 | 0.543 | 0.947 |
+| Split network, full defence | 0.735 | 0.491 | 0.111 |
+| All 22 features pooled in one place | 0.766 | 0.540 | – |
+
+What the real data shows:
+- **The other parties' data is what matters.** On its own, the bank's limit and demographics give 0.62. Adding repayment history and amounts through the split network gives 0.77, the same as pooling everything; the 0.003 difference is under one standard error (about 0.007).
+- **The defence costs less here than on synthetic data**: 0.035 ROC-AUC against 0.11. It keeps three quarters of what the other parties add.
+- **What leaks is what predicts.** Without the defence the attacker rebuilds every feature (R² 0.84–0.99). With it, R² falls to 0.11 overall, but the latest repayment status (PAY_0) is still recovered at R² 0.41. The one number each party sends is mostly a risk score, and PAY_0 is the strongest risk signal. Bill amounts, which hardly predict default, leak almost nothing (R² ≤ 0.01).
+
 ## Run it
 
 ```bash
 pip install -r requirements.txt
-python -m pytest -q                            # 8 tests
+python -m pytest -q                            # 9 tests
 python -m splitbureau bench --ablation         # about 40 s
+python -m splitbureau realdata --data FILE     # UCI credit default data, about 2.5 minutes
 python -m splitbureau serve --port 8017        # API + console at http://127.0.0.1:8017
 ```
 
@@ -70,7 +89,7 @@ Endpoints: `POST /psi/align`, `POST /train`, `POST /score`, `GET /bench`, `GET /
 
 ## Limits
 
-- **Synthetic data and simulated parties.** There is no network transport, no separate deployments and no real data. A public dataset with columns split into three "parties" (for example UCI's Default of Credit Card Clients) would give more realistic AUCs, but this has not been done.
+- **Simulated parties.** There is no network transport and no separate deployments. The real-data test splits one bank's columns three ways; real bureau or payments data would be noisier and only partly overlapping.
 - **No formal privacy guarantee.** There's no differential-privacy accounting and only two attack decoders. Label leakage through the gradients the bank sends back is not addressed.
 - **Semi-honest PSI only.** A malicious party could send malformed tokens or lie about its set, and hashing is not constant-time.
 - **Features have fairness and legal problems.** Late-night betting share, handset price tier and similar alternative data raise discrimination and consent issues that a real lender would need to clear with regulators and fair-lending review before use.

@@ -1,0 +1,105 @@
+{
+  "dataset": "UCI Default of Credit Card Clients (30,000 rows, CC BY 4.0)",
+  "parties": {
+    "bank": [
+      "LIMIT_BAL",
+      "EDUCATION",
+      "MARRIAGE",
+      "AGE"
+    ],
+    "bureau": [
+      "PAY_0",
+      "PAY_2",
+      "PAY_3",
+      "PAY_4",
+      "PAY_5",
+      "PAY_6"
+    ],
+    "payments": [
+      "BILL_AMT1",
+      "BILL_AMT2",
+      "BILL_AMT3",
+      "BILL_AMT4",
+      "BILL_AMT5",
+      "BILL_AMT6",
+      "PAY_AMT1",
+      "PAY_AMT2",
+      "PAY_AMT3",
+      "PAY_AMT4",
+      "PAY_AMT5",
+      "PAY_AMT6"
+    ]
+  },
+  "train_rows": 22500,
+  "test_rows": 7500,
+  "test_default_rate": 0.2181,
+  "epochs": 160,
+  "models": {
+    "bank_alone": {
+      "roc_auc": 0.6234,
+      "pr_auc": 0.2995,
+      "brier": 0.1654
+    },
+    "split_no_defence": {
+      "roc_auc": 0.7692,
+      "pr_auc": 0.5427,
+      "brier": 0.1352,
+      "attacker_r2": 0.9466,
+      "attacker_r2_bureau": 0.987,
+      "attacker_r2_payments": 0.9063,
+      "attacker_r2_per_feature": {
+        "bureau.PAY_0": 0.9929,
+        "bureau.PAY_2": 0.9884,
+        "bureau.PAY_3": 0.9877,
+        "bureau.PAY_4": 0.9892,
+        "bureau.PAY_5": 0.9763,
+        "bureau.PAY_6": 0.9875,
+        "payments.BILL_AMT1": 0.9581,
+        "payments.BILL_AMT2": 0.906,
+        "payments.BILL_AMT3": 0.9572,
+        "payments.BILL_AMT4": 0.9188,
+        "payments.BILL_AMT5": 0.9351,
+        "payments.BILL_AMT6": 0.8598,
+        "payments.PAY_AMT1": 0.8967,
+        "payments.PAY_AMT2": 0.9058,
+        "payments.PAY_AMT3": 0.9224,
+        "payments.PAY_AMT4": 0.8723,
+        "payments.PAY_AMT5": 0.843,
+        "payments.PAY_AMT6": 0.9003
+      }
+    },
+    "split_full_defence": {
+      "roc_auc": 0.7347,
+      "pr_auc": 0.4912,
+      "brier": 0.1421,
+      "attacker_r2": 0.1111,
+      "attacker_r2_bureau": 0.1654,
+      "attacker_r2_payments": 0.0568,
+      "attacker_r2_per_feature": {
+        "bureau.PAY_0": 0.4147,
+        "bureau.PAY_2": 0.1749,
+        "bureau.PAY_3": 0.118,
+        "bureau.PAY_4": 0.0998,
+        "bureau.PAY_5": 0.0979,
+        "bureau.PAY_6": 0.0869,
+        "payments.BILL_AMT1": 0.0098,
+        "payments.BILL_AMT2": 0.0069,
+        "payments.BILL_AMT3": 0.0041,
+        "payments.BILL_AMT4": 0.0047,
+        "payments.BILL_AMT5": 0.0017,
+        "payments.BILL_AMT6": 0.0016,
+        "payments.PAY_AMT1": 0.1815,
+        "payments.PAY_AMT2": 0.1151,
+        "payments.PAY_AMT3": 0.1398,
+        "payments.PAY_AMT4": 0.088,
+        "payments.PAY_AMT5": 0.0731,
+        "payments.PAY_AMT6": 0.0551
+      }
+    },
+    "pooled": {
+      "roc_auc": 0.7659,
+      "pr_auc": 0.5397,
+      "brier": 0.1361
+    }
+  }
+}
