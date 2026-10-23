@@ -2,6 +2,7 @@
 CLI entry point for splitbureau:
   - python -m splitbureau bench
   - python -m splitbureau serve --port 8017
+  - python -m splitbureau realdata --data FILE   (UCI credit default data -> results/real_data.json)
 """
 
 from __future__ import annotations
@@ -35,7 +36,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     serve_p.add_argument("--host", type=str, default="127.0.0.1")
     serve_p.add_argument("--port", type=int, default=8017)
 
+    real_p = sub.add_parser("realdata", help="Split learning on the UCI credit-card default data")
+    real_p.add_argument("--data", required=True, help='"default of credit card clients.xls" (or a CSV export)')
+    real_p.add_argument("--epochs", type=int, default=160)
+    real_p.add_argument("--out", default="results/real_data.json")
+
     args = parser.parse_args(list(argv) if argv is not None else None)
+
+    if args.command == "realdata":
+        from .realdata import main as realdata
+
+        print(json.dumps(realdata(args.data, args.out, args.epochs)["models"], indent=2))
+        return 0
 
     if args.command == "serve":
         if args.host not in ("127.0.0.1", "localhost", "::1") and not os.environ.get("SPLITBUREAU_API_KEY"):
