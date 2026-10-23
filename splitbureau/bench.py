@@ -7,10 +7,10 @@ Benchmarks:
      (checked against the plaintext IDs, which only a simulation can do).
   2. Single-Party (Retail Bank Alone) vs Unprotected 3-Party Vertical SplitNN
      vs Privacy-Defended 3-Party Vertical SplitNN vs Centralized Oracle MLP.
-  3. Semi-honest Coordinator Feature-Inversion Attack R^2 comparison:
-     proves Unprotected SplitNN leaks raw features (R^2 > 0.80), while the
-     3-stage Cut-Layer Privacy Defense slashes attacker R^2 to < 0.12 with
-     minimal ROC-AUC / PR-AUC drop and massive gain over Bank-alone.
+  3. Semi-honest Coordinator Feature-Inversion Attack R^2 for the unprotected and the
+     defended model, alongside the accuracy each one gives up.
+
+All data is synthetic (see data.py).
 """
 
 from __future__ import annotations
@@ -132,7 +132,7 @@ def run_full_benchmark(
     )
 
     # 4. Privacy-Defended 3-Party Vertical SplitNN
-    #    (L2 Norm Clipping + Distance-Correlation Penalty + Calibrated Gaussian Noise)
+    #    (rank-1 bottleneck + L2 norm clipping + cross-covariance penalty + Gaussian noise)
     defended_cfg = CutLayerDefenseConfig(
         enabled=True,
         clip_norm=0.95,
@@ -195,14 +195,13 @@ def run_full_benchmark(
         unprotected_inv.overall_mean_r2 - defended_inv.overall_mean_r2, 4
     )
 
+    # Sanity checks only: the PSI found exactly the common customers, the defence reduced
+    # leakage, and the three-party model still beats the bank on its own.
     assertions_ok = bool(
         psi_res.exact_recovery_rate == 1.0
         and psi_res.intersection_size == n_common
-        and unprotected_inv.overall_mean_r2 > 0.80
-        and defended_inv.overall_mean_r2 < 0.12
-        and roc_gain > 0.10
-        and pr_gain > 0.12
-        and abs(roc_drop) < 0.035
+        and defended_inv.overall_mean_r2 < unprotected_inv.overall_mean_r2
+        and roc_gain > 0.0
     )
 
     elapsed_sec = round(time.perf_counter() - t0, 3)
@@ -279,10 +278,10 @@ def format_benchmark_report(summary: BenchmarkSummary) -> str:
         f"    ROC-AUC Gain (Defended SplitNN vs Bank-Only) : +{summary.roc_auc_gain_over_bank:.4f}",
         f"    PR-AUC Gain  (Defended SplitNN vs Bank-Only) : +{summary.pr_auc_gain_over_bank:.4f}",
         f"    ROC-AUC Drop (Defended vs Unprotected)       : {summary.roc_auc_drop_vs_unprotected:+.4f}",
-        f"    Unprotected Attacker Reconstruction R^2      : {summary.unprotected_inversion.overall_mean_r2:.4f} (> 0.80)",
-        f"    Defended Attacker Reconstruction R^2         : {summary.defended_inversion.overall_mean_r2:.4f} (< 0.12)",
-        f"    Attacker R^2 Slashed By                      : -{summary.inversion_r2_reduction:.4f}",
-        f"    All Benchmark Assertions Passed              : {summary.all_assertions_passed}",
+        f"    Unprotected Attacker Reconstruction R^2      : {summary.unprotected_inversion.overall_mean_r2:.4f}",
+        f"    Defended Attacker Reconstruction R^2         : {summary.defended_inversion.overall_mean_r2:.4f}",
+        f"    Attacker R^2 Reduced By                      : {summary.inversion_r2_reduction:.4f}",
+        f"    Sanity Checks Passed                         : {summary.all_assertions_passed}",
         "=" * 86,
     ]
     return "\n".join(lines)

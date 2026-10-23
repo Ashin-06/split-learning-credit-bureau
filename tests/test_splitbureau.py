@@ -75,3 +75,19 @@ def test_psi_points_are_in_the_prime_subgroup_and_scalars_are_fresh() -> None:
     r2 = align_two_parties(["a", "b"], ["b", "c"])
     assert r1.sample_u_hex != r2.sample_u_hex
     assert r1.aligned_indices_a == r2.aligned_indices_a == [1]
+
+
+def test_defence_reduces_leakage_against_the_stronger_attacker(dataset) -> None:
+    from splitbureau.inversion import evaluate_cut_layer_leakage
+
+    def leakage(cfg):
+        m = SplitCreditNet(defense_config=cfg, seed=7)
+        m.fit(dataset.x_bank_train, dataset.x_upi_train, dataset.x_telecom_train, dataset.y_train, epochs=60)
+        return evaluate_cut_layer_leakage(m, dataset.x_bank_train, dataset.x_upi_train, dataset.x_telecom_train,
+                                          dataset.x_bank_test, dataset.x_upi_test, dataset.x_telecom_test).overall_mean_r2
+
+    plain = leakage(CutLayerDefenseConfig(enabled=False))
+    defended = leakage(CutLayerDefenseConfig(enabled=True))
+    # Even without any raw-feature shortcut, an 8-d embedding of 4 features is nearly invertible
+    assert plain > 0.7
+    assert defended < plain - 0.4

@@ -6,9 +6,11 @@ cut-layer embeddings z_k in R^d of external institutions:
   - Party 2 (UPI Super-App): 4 private features
   - Party 3 (Telecom & Utility): 4 private features
 
-The attacker fits a regularized nonlinear + Ridge decoder D_k: R^d -> R^4 on
-observed cut-layer embeddings and evaluates out-of-sample reconstruction R^2
-and MSE on held-out test records.
+The attacker fits two decoders D_k: R^d -> R^4 on observed cut-layer embeddings of training
+records whose raw features it knows (a strong assumption that favours the attacker): a ridge
+regression on a quadratic basis and a small MLP. Each party's leakage is the better of the two
+on held-out records. Neither is the strongest possible attack, so a low R^2 bounds leakage only
+against these decoders.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from typing import Dict, Sequence, Tuple
 
 import numpy as np
 from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.neural_network import MLPRegressor
 
 from .data import TELECOM_FEATURES, UPI_FEATURES
 from .splitnn import SplitCreditNet
@@ -99,6 +102,36 @@ class FeatureInversionAttack:
         return round(mean_r2, 4), round(mse, 4), per_feat
 
 
+class MLPInversionAttack(FeatureInversionAttack):
+    """Two-hidden-layer MLP decoder from cut-layer embeddings to raw features."""
+
+    def __init__(self, seed: int = 0) -> None:
+        super().__init__()
+        self.mlp_ = MLPRegressor(hidden_layer_sizes=(64, 64), max_iter=2000, random_state=seed)
+
+    def fit(self, z_train: np.ndarray, x_train: np.ndarray) -> "MLPInversionAttack":
+        self.mlp_.fit(z_train, x_train)
+        return self
+
+    def reconstruct(self, z_test: np.ndarray) -> np.ndarray:
+        return self.mlp_.predict(z_test)
+
+
+def _strongest_attack(
+    z_tr: np.ndarray,
+    x_tr: np.ndarray,
+    z_te: np.ndarray,
+    x_te: np.ndarray,
+    feature_names: Sequence[str],
+    ridge_alpha: float,
+) -> Tuple[float, float, Dict[str, float]]:
+    results = [
+        FeatureInversionAttack(ridge_alpha=ridge_alpha).fit(z_tr, x_tr).score_reconstruction(z_te, x_te, feature_names),
+        MLPInversionAttack().fit(z_tr, x_tr).score_reconstruction(z_te, x_te, feature_names),
+    ]
+    return max(results, key=lambda r: r[0])
+
+
 def evaluate_cut_layer_leakage(
     model: SplitCreditNet,
     x_bank_train: np.ndarray,
@@ -121,16 +154,11 @@ def evaluate_cut_layer_leakage(
         x_bank_test, x_upi_test, x_telecom_test, training=False
     )
 
-    attacker_upi = FeatureInversionAttack(ridge_alpha=ridge_alpha).fit(z2_tr, x_upi_train)
-    upi_r2, upi_mse, upi_per_feat = attacker_upi.score_reconstruction(
-        z2_te, x_upi_test, UPI_FEATURES
+    upi_r2, upi_mse, upi_per_feat = _strongest_attack(
+        z2_tr, x_upi_train, z2_te, x_upi_test, UPI_FEATURES, ridge_alpha
     )
-
-    attacker_tel = FeatureInversionAttack(ridge_alpha=ridge_alpha).fit(
-        z3_tr, x_telecom_train
-    )
-    tel_r2, tel_mse, tel_per_feat = attacker_tel.score_reconstruction(
-        z3_te, x_telecom_test, TELECOM_FEATURES
+    tel_r2, tel_mse, tel_per_feat = _strongest_attack(
+        z3_tr, x_telecom_train, z3_te, x_telecom_test, TELECOM_FEATURES, ridge_alpha
     )
 
     overall_r2 = round(0.5 * (upi_r2 + tel_r2), 4)

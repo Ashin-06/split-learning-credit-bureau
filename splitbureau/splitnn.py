@@ -16,8 +16,12 @@ Cut-Layer Privacy Defense (for external feature parties k in {2, 3} and optional
   2. L2 Activation Norm Clipping:
      z_bar_{k,i} = z_tilde_{k,i} * min(1, C / (||z_tilde_{k,i}||_2 + eps)),
      bounding the L2 sensitivity of every transmitted embedding vector.
-  3. Calibrated Gaussian Noise Mechanism:
+  3. Gaussian Noise:
      z_k = z_bar_k + N(0, sigma^2 I_d) at the cut layer prior to transmission.
+     sigma is a fixed setting, not calibrated to a differential-privacy budget; no epsilon is
+     claimed or tracked across training steps.
+  The low-rank bottleneck (rank 1 by default: each party effectively sends one number)
+  provides most of the protection; see the README for an ablation.
 """
 
 from __future__ import annotations
@@ -158,10 +162,6 @@ class PartyBottomNet:
 
         self.b2 = np.zeros((1, embed_dim), dtype=np.float64)
 
-        # Unprotected wide SplitNNs naturally preserve input span via wide/residual projections
-        orth_proj, _ = np.linalg.qr(self.rng.normal(size=(embed_dim, input_dim)))
-        self.skip_proj = orth_proj.T  # (input_dim, embed_dim)
-
         # Forward cache for backprop
         self._cache: Dict[str, np.ndarray] = {}
 
@@ -181,7 +181,7 @@ class PartyBottomNet:
         else:
             bottleneck_pre = np.empty((0, 0))
             bottleneck_act = np.empty((0, 0))
-            z_tilde = h @ self.W2 + self.b2 + 0.65 * (x @ self.skip_proj)
+            z_tilde = h @ self.W2 + self.b2
 
         # Stage 2 of Defense: L2 Activation Norm Clipping
         if self.defense.enabled and self.protect_cut_layer:
