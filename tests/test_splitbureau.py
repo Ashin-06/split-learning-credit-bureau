@@ -59,3 +59,19 @@ def test_api_endpoints() -> None:
     assert r.status_code == 200 and len(r.json()["matched_customer_ids_order"]) == 3
     r = client.post("/score", json={})
     assert r.status_code == 200 and 0.0 <= r.json()["splitnn_default_probability"] <= 1.0
+
+
+def test_psi_points_are_in_the_prime_subgroup_and_scalars_are_fresh() -> None:
+    import nacl.bindings as sodium
+
+    from splitbureau.psi import ED25519_L, hash_to_group
+
+    for ident in ("PAN_COMMON_00001", "9876543210", "x"):
+        h = hash_to_group(ident)
+        minus_h = sodium.crypto_scalarmult_ed25519_noclamp((ED25519_L - 1).to_bytes(32, "little"), h)
+        assert sodium.crypto_core_ed25519_add(minus_h, h) == bytes([1]) + bytes(31)  # L*H == identity
+    # Secret scalars are random per run, so the same IDs give different tokens each time
+    r1 = align_two_parties(["a", "b"], ["b", "c"])
+    r2 = align_two_parties(["a", "b"], ["b", "c"])
+    assert r1.sample_u_hex != r2.sample_u_hex
+    assert r1.aligned_indices_a == r2.aligned_indices_a == [1]

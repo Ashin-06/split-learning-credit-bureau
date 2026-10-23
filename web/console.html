@@ -125,7 +125,7 @@
       <div>
         <h1>SplitBureau: Vertically Partitioned DH-PSI &amp; Split-Learning Credit Bureau</h1>
         <div class="subtitle">
-          Safe-Prime Commutative Diffie-Hellman PSI + 3-Party Vertical SplitNN + Cut-Layer Feature-Inversion Defense
+          Elliptic-Curve Diffie-Hellman PSI + 3-Party Vertical SplitNN + Cut-Layer Feature-Inversion Defense
         </div>
       </div>
       <div class="badge">FastAPI Port 8017 &bull; Zero Raw Feature Sharing</div>
@@ -162,11 +162,11 @@
       <!-- DH-PSI Alignment Workbench -->
       <div class="card">
         <h2>
-          <span>2. Safe-Prime Diffie-Hellman PSI Alignment</span>
+          <span>2. Elliptic-Curve Diffie-Hellman PSI Alignment</span>
           <button onclick="runPSI()">Execute DH-PSI (/psi/align)</button>
         </h2>
         <p style="font-size: 0.82rem; color: var(--muted); margin-bottom: 8px;">
-          Blinds customer PANs via <code>u_i = H(id_i)^&alpha; mod p</code> and <code>v_i = u_i^&beta; mod p</code> over RFC 2409 768-bit safe prime subgroup Q_p.
+          Blinds customer PANs via <code>u_i = a&middot;H(id_i)</code> and <code>v_i = b&middot;u_i</code> in the prime-order subgroup of Ed25519 (libsodium).
         </p>
         <label>Party 1 (Retail Bank) Customer PANs (comma-separated)</label>
         <input id="psi-bank" value="PAN_COMMON_00001, PAN_COMMON_00002, PAN_BANK_ONLY_991, PAN_COMMON_00003, PAN_BANK_ONLY_992" />
@@ -219,14 +219,13 @@
       const res = await fetch('/psi/align', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ bank_ids, upi_ids, telecom_ids, seed: 42 })
+        body: JSON.stringify({ bank_ids, upi_ids, telecom_ids })
       });
       const data = await res.json();
       const r = data.result;
       document.getElementById('psi-out').innerHTML = `
         <div class="metric-row"><span>Aligned Common Cohort Size</span><span class="metric-val good">${r.intersection_size} customers</span></div>
         <div class="metric-row"><span>Exact Intersection Recovery</span><span class="metric-val good">${(r.exact_recovery_rate * 100).toFixed(1)}%</span></div>
-        <div class="metric-row"><span>Non-Overlapping IDs Leaked</span><span class="metric-val good">${r.non_overlap_leaked} (Zero Knowledge Outside Intersection)</span></div>
         <div class="metric-row"><span>Aligned Bank / UPI / Telecom Indices</span><span class="metric-val">[${r.aligned_indices_bank.join(', ')}] &harr; [${r.aligned_indices_upi.join(', ')}] &harr; [${r.aligned_indices_telecom.join(', ')}]</span></div>
         <div class="metric-row"><span>Double-Blinded Token Sample (v_i)</span><span class="metric-val">${r.pairwise_bank_upi.aligned_double_blinded_tokens_hex[0] || 'N/A'}</span></div>
       `;
@@ -268,7 +267,7 @@
       const res = await fetch('/bench');
       const b = await res.json();
       document.getElementById('bench-status').innerHTML = `
-        DH-PSI aligned <strong>${b.psi_result.intersection_size}</strong> common customers (${(b.psi_result.exact_recovery_rate*100).toFixed(1)}% recovery, ${b.psi_result.non_overlap_leaked} non-overlap leaked) in ${b.psi_result.elapsed_ms} ms.
+        DH-PSI aligned <strong>${b.psi_result.intersection_size}</strong> common customers (${(b.psi_result.exact_recovery_rate*100).toFixed(1)}% recovery) in ${b.psi_result.elapsed_ms} ms.
         ROC-AUC Gain over Bank-Only: <strong class="good">+${b.roc_auc_gain_over_bank}</strong> &bull; Attacker R&sup2; Slashed: <strong class="good">${b.unprotected_inversion.overall_mean_r2} &rarr; ${b.defended_inversion.overall_mean_r2}</strong>.
       `;
       const rows = [

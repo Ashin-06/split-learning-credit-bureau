@@ -9,9 +9,8 @@ from .psi import (
     ThreePartyPSIResult,
     align_two_parties,
     align_three_parties,
-    SAFE_PRIME_P,
-    SUBGROUP_ORDER_Q,
-    hash_to_subgroup,
+    ED25519_L,
+    hash_to_group,
 )
 from .data import (
     BANK_FEATURES,
@@ -49,9 +48,8 @@ __all__ = [
     "ThreePartyPSIResult",
     "align_two_parties",
     "align_three_parties",
-    "SAFE_PRIME_P",
-    "SUBGROUP_ORDER_Q",
-    "hash_to_subgroup",
+    "ED25519_L",
+    "hash_to_group",
     "BANK_FEATURES",
     "UPI_FEATURES",
     "TELECOM_FEATURES",

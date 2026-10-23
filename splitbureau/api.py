@@ -4,7 +4,7 @@ FastAPI Service for the Vertically Partitioned DH-PSI & Split-Learning Credit Bu
 Endpoints:
   - GET  /          : Interactive HTML Console (web/console.html)
   - GET  /health    : Service health & metadata
-  - POST /psi/align : Run 2-party or 3-party Safe-Prime DH-PSI alignment
+  - POST /psi/align : Run 2-party or 3-party elliptic-curve DH-PSI alignment
   - POST /train     : Train Vertical SplitNN with configurable Cut-Layer Privacy Defense
   - POST /score     : Score a borrower via 3-party Cut-Layer embeddings (never sharing raw features)
   - GET  /bench     : Run & return full benchmark suite metrics
@@ -41,7 +41,7 @@ app = FastAPI(
     title="SplitBureau: DH-PSI & Vertical Split-Learning Credit Bureau",
     version="1.0.0",
     description=(
-        "Vertically Partitioned Safe-Prime Diffie-Hellman PSI & 3-Party Split Neural "
+        "Vertically Partitioned Elliptic-Curve Diffie-Hellman PSI & 3-Party Split Neural "
         "Network Credit Bureau with Cut-Layer Feature-Inversion Defense."
     ),
 )
@@ -116,7 +116,6 @@ class PSIAlignRequest(BaseModel):
             "PAN_COMMON_00003",
         ]
     )
-    seed: int = 42
 
 
 class TrainSplitNNRequest(BaseModel):
@@ -174,16 +173,14 @@ def health() -> Dict[str, Any]:
 @app.post("/psi/align")
 def psi_align(req: PSIAlignRequest) -> Dict[str, Any]:
     if req.telecom_ids is not None and len(req.telecom_ids) > 0:
-        res3 = align_three_parties(
-            req.bank_ids, req.upi_ids, req.telecom_ids, seed=req.seed
-        )
+        res3 = align_three_parties(req.bank_ids, req.upi_ids, req.telecom_ids)
         matched_ids = [req.bank_ids[i] for i in res3.aligned_indices_bank]
         return {
             "mode": "three_party_dh_psi",
             "matched_customer_ids_order": matched_ids,
             "result": dataclasses.asdict(res3),
         }
-    res2 = align_two_parties(req.bank_ids, req.upi_ids, seed=req.seed)
+    res2 = align_two_parties(req.bank_ids, req.upi_ids)
     matched_ids = [req.bank_ids[i] for i in res2.aligned_indices_a]
     return {
         "mode": "two_party_dh_psi",

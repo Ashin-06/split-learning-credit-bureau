@@ -24,7 +24,7 @@ feature slices for customers identified by PAN / phone number:
 from __future__ import annotations
 
 import dataclasses
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 
@@ -266,7 +266,6 @@ def build_aligned_dataset_from_registries(
         registries.bank_ids,
         registries.upi_ids,
         registries.telecom_ids,
-        seed=seed,
     )
 
     idx_b = psi_res.aligned_indices_bank

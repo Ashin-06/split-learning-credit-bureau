@@ -3,8 +3,8 @@ End-to-End Benchmark Suite for Vertically Partitioned DH-PSI & Split-Learning
 Credit Bureau with Cut-Layer Feature-Inversion Defense.
 
 Benchmarks:
-  1. Safe-Prime Diffie-Hellman PSI alignment across 3 institutions
-     (100% intersection recovery, 0 non-overlap leakage).
+  1. Elliptic-curve Diffie-Hellman PSI alignment across 3 institutions
+     (checked against the plaintext IDs, which only a simulation can do).
   2. Single-Party (Retail Bank Alone) vs Unprotected 3-Party Vertical SplitNN
      vs Privacy-Defended 3-Party Vertical SplitNN vs Centralized Oracle MLP.
   3. Semi-honest Coordinator Feature-Inversion Attack R^2 comparison:
@@ -197,7 +197,6 @@ def run_full_benchmark(
 
     assertions_ok = bool(
         psi_res.exact_recovery_rate == 1.0
-        and psi_res.non_overlap_leaked == 0
         and psi_res.intersection_size == n_common
         and unprotected_inv.overall_mean_r2 > 0.80
         and defended_inv.overall_mean_r2 < 0.12
@@ -232,13 +231,12 @@ def format_benchmark_report(summary: BenchmarkSummary) -> str:
         "  SPLITBUREAU: 3-PARTY DH-PSI & VERTICAL SPLIT-LEARNING CREDIT BUREAU BENCHMARK",
         "=" * 86,
         "",
-        "[1] SAFE-PRIME DIFFIE-HELLMAN PRIVATE SET INTERSECTION (DH-PSI)",
+        "[1] ELLIPTIC-CURVE DIFFIE-HELLMAN PRIVATE SET INTERSECTION (DH-PSI)",
         f"    Party 1 (Bank) Raw Records     : {summary.psi_result.bank_count}",
         f"    Party 2 (UPI App) Raw Records  : {summary.psi_result.upi_count}",
         f"    Party 3 (Telecom) Raw Records  : {summary.psi_result.telecom_count}",
         f"    3-Way Aligned Intersection     : {summary.psi_result.intersection_size}",
         f"    Exact Intersection Recovery    : {summary.psi_result.exact_recovery_rate * 100:.2f}%",
-        f"    Non-Overlapping IDs Leaked     : {summary.psi_result.non_overlap_leaked}",
         f"    DH-PSI Alignment Latency       : {summary.psi_result.elapsed_ms:.2f} ms",
         "",
         "[2] CREDIT DEFAULT PREDICTION vs CUT-LAYER FEATURE-INVERSION ATTACK",
