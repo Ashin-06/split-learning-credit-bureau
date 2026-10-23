@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SplitBureau — DH-PSI & Vertical Split-Learning Credit Bureau</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel: #131b2e;
+      --panel-alt: #18233c;
+      --border: #263554;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --indigo: #818cf8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .container { max-width: 1320px; margin: 0 auto; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+    .badge {
+      background: rgba(56, 189, 248, 0.14);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 24px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h2 {
+      font-size: 1.05rem;
+      margin-bottom: 12px;
+      color: var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.88rem;
+    }
+    .metric-val { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .good { color: var(--emerald); }
+    .warn { color: var(--amber); }
+    .bad { color: var(--rose); }
+    button {
+      background: linear-gradient(135deg, #0284c7, #4f46e5);
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.92; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; margin-top: 8px; }
+    input, textarea {
+      width: 100%;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.84rem;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
+    th, td {
+      padding: 10px 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-weight: 600; }
+    .bar-wrap {
+      background: #0b0f19;
+      height: 10px;
+      border-radius: 5px;
+      overflow: hidden;
+      width: 120px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    .bar-fill { height: 100%; border-radius: 5px; }
+    @media (max-width: 960px) {
+      .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>SplitBureau: Vertically Partitioned DH-PSI &amp; Split-Learning Credit Bureau</h1>
+        <div class="subtitle">
+          Safe-Prime Commutative Diffie-Hellman PSI + 3-Party Vertical SplitNN + Cut-Layer Feature-Inversion Defense
+        </div>
+      </div>
+      <div class="badge">FastAPI Port 8017 &bull; Zero Raw Feature Sharing</div>
+    </header>
+
+    <!-- Benchmark & Model Comparison Table -->
+    <div class="card" style="margin-bottom: 24px;">
+      <h2>
+        <span>1. Multi-Institution Credit Default &amp; Cut-Layer Inversion Benchmark</span>
+        <button onclick="loadBenchmark()">Run Live Benchmark (/bench)</button>
+      </h2>
+      <div id="bench-status" style="color: var(--muted); font-size: 0.85rem; margin-bottom: 10px;">
+        Click "Run Live Benchmark" to execute 3-Party DH-PSI + Vertical SplitNN + Attacker Feature Reconstruction.
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Architecture</th>
+            <th>ROC-AUC</th>
+            <th>PR-AUC</th>
+            <th>Brier Score</th>
+            <th>Attacker Inversion R&sup2;</th>
+            <th>dCor(X, Z)</th>
+            <th>Privacy Verdict</th>
+          </tr>
+        </thead>
+        <tbody id="bench-tbody">
+          <tr><td colspan="7" style="color: var(--muted);">Ready to run benchmark...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-2">
+      <!-- DH-PSI Alignment Workbench -->
+      <div class="card">
+        <h2>
+          <span>2. Safe-Prime Diffie-Hellman PSI Alignment</span>
+          <button onclick="runPSI()">Execute DH-PSI (/psi/align)</button>
+        </h2>
+        <p style="font-size: 0.82rem; color: var(--muted); margin-bottom: 8px;">
+          Blinds customer PANs via <code>u_i = H(id_i)^&alpha; mod p</code> and <code>v_i = u_i^&beta; mod p</code> over RFC 2409 768-bit safe prime subgroup Q_p.
+        </p>
+        <label>Party 1 (Retail Bank) Customer PANs (comma-separated)</label>
+        <input id="psi-bank" value="PAN_COMMON_00001, PAN_COMMON_00002, PAN_BANK_ONLY_991, PAN_COMMON_00003, PAN_BANK_ONLY_992" />
+        <label>Party 2 (UPI Super-App) Customer PANs</label>
+        <input id="psi-upi" value="PAN_UPI_ONLY_501, PAN_COMMON_00003, PAN_COMMON_00001, PAN_UPI_ONLY_502, PAN_COMMON_00002" />
+        <label>Party 3 (Telecom &amp; Utility) Customer PANs</label>
+        <input id="psi-tel" value="PAN_COMMON_00002, PAN_TEL_ONLY_701, PAN_COMMON_00001, PAN_COMMON_00003" />
+        <div id="psi-out" style="margin-top: 14px; font-size: 0.84rem;"></div>
+      </div>
+
+      <!-- Live 3-Party SplitNN Borrower Scoring -->
+      <div class="card">
+        <h2>
+          <span>3. Live 3-Party Vertical SplitNN Credit Scorer</span>
+          <button onclick="scoreBorrower()">Score via Cut-Layer (/score)</button>
+        </h2>
+        <div class="grid-3" style="margin-bottom: 10px; gap: 10px;">
+          <div>
+            <strong style="font-size: 0.8rem; color: var(--accent);">Party 1: Bank</strong>
+            <label>Savings (Lakhs)</label><input id="f-sav" type="number" step="0.1" value="1.8" />
+            <label>Salary Regularity</label><input id="f-sal" type="number" step="0.05" value="0.65" />
+            <label>Bounce Count (12m)</label><input id="f-bnc" type="number" step="1" value="2" />
+            <label>Credit Utilization</label><input id="f-uti" type="number" step="0.05" value="0.68" />
+          </div>
+          <div>
+            <strong style="font-size: 0.8rem; color: var(--emerald);">Party 2: UPI App</strong>
+            <label>Spend Diversity</label><input id="f-div" type="number" step="0.05" value="0.35" />
+            <label>Late-Night Betting</label><input id="f-bet" type="number" step="0.05" value="0.52" />
+            <label>P2P Velocity</label><input id="f-p2p" type="number" step="0.5" value="5.4" />
+            <label>BNPL Rollovers</label><input id="f-bnp" type="number" step="1" value="4" />
+          </div>
+          <div>
+            <strong style="font-size: 0.8rem; color: var(--indigo);">Party 3: Telecom</strong>
+            <label>SIM Tenure (m)</label><input id="f-sim" type="number" step="1" value="11" />
+            <label>Recharge Regularity</label><input id="f-rec" type="number" step="0.05" value="0.38" />
+            <label>Electricity On-Time</label><input id="f-ele" type="number" step="0.05" value="0.41" />
+            <label>Device Tier (1-5)</label><input id="f-dev" type="number" step="0.5" value="2.0" />
+          </div>
+        </div>
+        <div id="score-out" style="margin-top: 10px; font-size: 0.85rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function runPSI() {
+      const bank_ids = document.getElementById('psi-bank').value.split(',').map(s => s.trim()).filter(Boolean);
+      const upi_ids = document.getElementById('psi-upi').value.split(',').map(s => s.trim()).filter(Boolean);
+      const telecom_ids = document.getElementById('psi-tel').value.split(',').map(s => s.trim()).filter(Boolean);
+      const res = await fetch('/psi/align', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ bank_ids, upi_ids, telecom_ids, seed: 42 })
+      });
+      const data = await res.json();
+      const r = data.result;
+      document.getElementById('psi-out').innerHTML = `
+        <div class="metric-row"><span>Aligned Common Cohort Size</span><span class="metric-val good">${r.intersection_size} customers</span></div>
+        <div class="metric-row"><span>Exact Intersection Recovery</span><span class="metric-val good">${(r.exact_recovery_rate * 100).toFixed(1)}%</span></div>
+        <div class="metric-row"><span>Non-Overlapping IDs Leaked</span><span class="metric-val good">${r.non_overlap_leaked} (Zero Knowledge Outside Intersection)</span></div>
+        <div class="metric-row"><span>Aligned Bank / UPI / Telecom Indices</span><span class="metric-val">[${r.aligned_indices_bank.join(', ')}] &harr; [${r.aligned_indices_upi.join(', ')}] &harr; [${r.aligned_indices_telecom.join(', ')}]</span></div>
+        <div class="metric-row"><span>Double-Blinded Token Sample (v_i)</span><span class="metric-val">${r.pairwise_bank_upi.aligned_double_blinded_tokens_hex[0] || 'N/A'}</span></div>
+      `;
+    }
+
+    async function scoreBorrower() {
+      const payload = {
+        customer_id: "PAN_COMMON_00042",
+        savings_balance: parseFloat(document.getElementById('f-sav').value),
+        salary_regularity: parseFloat(document.getElementById('f-sal').value),
+        bounce_count: parseFloat(document.getElementById('f-bnc').value),
+        credit_utilization: parseFloat(document.getElementById('f-uti').value),
+        merchant_spend_diversity: parseFloat(document.getElementById('f-div').value),
+        late_night_betting_share: parseFloat(document.getElementById('f-bet').value),
+        p2p_velocity: parseFloat(document.getElementById('f-p2p').value),
+        bnpl_rollover_count: parseFloat(document.getElementById('f-bnp').value),
+        sim_tenure_months: parseFloat(document.getElementById('f-sim').value),
+        prepaid_recharge_consistency: parseFloat(document.getElementById('f-rec').value),
+        electricity_ontime_ratio: parseFloat(document.getElementById('f-ele').value),
+        device_price_tier: parseFloat(document.getElementById('f-dev').value),
+      };
+      const res = await fetch('/score', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const d = await res.json();
+      document.getElementById('score-out').innerHTML = `
+        <div class="metric-row"><span>3-Party SplitNN Default Probability</span><span class="metric-val warn">${(d.splitnn_default_probability * 100).toFixed(2)}%</span></div>
+        <div class="metric-row"><span>Single-Party (Bank Alone) Probability</span><span class="metric-val">${(d.bank_only_default_probability * 100).toFixed(2)}%</span></div>
+        <div class="metric-row"><span>SplitBureau Credit Score (300-900)</span><span class="metric-val good">${d.bureau_credit_score} (${d.risk_tier})</span></div>
+        <div class="metric-row"><span>Underwriting Decision</span><span class="metric-val">${d.recommended_decision}</span></div>
+        <div class="metric-row"><span>Cut-Layer L2 Norms (UPI / Telecom)</span><span class="metric-val">${d.cut_layer_telemetry.z_upi_norm} / ${d.cut_layer_telemetry.z_telecom_norm}</span></div>
+      `;
+    }
+
+    async function loadBenchmark() {
+      document.getElementById('bench-status').innerText = 'Running 3-Party DH-PSI + Vertical SplitNN Training + Inversion Attack...';
+      const res = await fetch('/bench');
+      const b = await res.json();
+      document.getElementById('bench-status').innerHTML = `
+        DH-PSI aligned <strong>${b.psi_result.intersection_size}</strong> common customers (${(b.psi_result.exact_recovery_rate*100).toFixed(1)}% recovery, ${b.psi_result.non_overlap_leaked} non-overlap leaked) in ${b.psi_result.elapsed_ms} ms.
+        ROC-AUC Gain over Bank-Only: <strong class="good">+${b.roc_auc_gain_over_bank}</strong> &bull; Attacker R&sup2; Slashed: <strong class="good">${b.unprotected_inversion.overall_mean_r2} &rarr; ${b.defended_inversion.overall_mean_r2}</strong>.
+      `;
+      const rows = [
+        {
+          name: '1. Single-Party (Retail Bank Only)',
+          roc: b.bank_only_metrics.roc_auc,
+          pr: b.bank_only_metrics.pr_auc,
+          brier: b.bank_only_metrics.brier_score,
+          r2: 0.0,
+          dcor: 0.0,
+          verdict: 'LOCAL_ONLY (Low Utility)'
+        },
+        {
+          name: '2. Unprotected 3-Party Vertical SplitNN',
+          roc: b.unprotected_splitnn_metrics.roc_auc,
+          pr: b.unprotected_splitnn_metrics.pr_auc,
+          brier: b.unprotected_splitnn_metrics.brier_score,
+          r2: b.unprotected_inversion.overall_mean_r2,
+          dcor: ((b.unprotected_splitnn_metrics.distance_corr_upi + b.unprotected_splitnn_metrics.distance_corr_telecom)/2).toFixed(4),
+          verdict: b.unprotected_inversion.privacy_verdict
+        },
+        {
+          name: '3. Privacy-Defended 3-Party Vertical SplitNN',
+          roc: b.defended_splitnn_metrics.roc_auc,
+          pr: b.defended_splitnn_metrics.pr_auc,
+          brier: b.defended_splitnn_metrics.brier_score,
+          r2: b.defended_inversion.overall_mean_r2,
+          dcor: ((b.defended_splitnn_metrics.distance_corr_upi + b.defended_splitnn_metrics.distance_corr_telecom)/2).toFixed(4),
+          verdict: b.defended_inversion.privacy_verdict
+        },
+        {
+          name: '4. Centralized Oracle (Plaintext 12 Features)',
+          roc: b.centralized_oracle_metrics.roc_auc,
+          pr: b.centralized_oracle_metrics.pr_auc,
+          brier: b.centralized_oracle_metrics.brier_score,
+          r2: 1.0,
+          dcor: 1.0,
+          verdict: 'PLAINTEXT_EXPOSED'
+        }
+      ];
+      document.getElementById('bench-tbody').innerHTML = rows.map(r => `
+        <tr>
+          <td><strong>${r.name}</strong></td>
+          <td class="metric-val">${r.roc.toFixed(4)}</td>
+          <td class="metric-val">${r.pr.toFixed(4)}</td>
+          <td class="metric-val">${r.brier.toFixed(4)}</td>
+          <td class="metric-val ${r.r2 > 0.5 ? 'bad' : 'good'}">${r.r2.toFixed(4)}</td>
+          <td class="metric-val">${r.dcor}</td>
+          <td><span class="${r.r2 > 0.5 ? 'bad' : 'good'}">${r.verdict}</span></td>
+        </tr>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
