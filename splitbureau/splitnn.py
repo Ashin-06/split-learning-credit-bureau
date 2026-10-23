@@ -392,6 +392,7 @@ class SplitCreditNet:
         top_hidden_dim: int = 16,
         defense_config: Optional[CutLayerDefenseConfig] = None,
         seed: int = 42,
+        input_dims: Tuple[int, int, int] = (4, 4, 4),
     ) -> None:
         self.embed_dim = embed_dim
         self.hidden_dim = hidden_dim
@@ -404,7 +405,7 @@ class SplitCreditNet:
         self.party_bank = PartyBottomNet(
             party_id=1,
             party_name="Party1_Bank",
-            input_dim=4,
+            input_dim=input_dims[0],
             hidden_dim=hidden_dim,
             embed_dim=embed_dim,
             defense=self.defense_config,
@@ -414,7 +415,7 @@ class SplitCreditNet:
         self.party_upi = PartyBottomNet(
             party_id=2,
             party_name="Party2_UPI",
-            input_dim=4,
+            input_dim=input_dims[1],
             hidden_dim=hidden_dim,
             embed_dim=embed_dim,
             defense=self.defense_config,
@@ -424,7 +425,7 @@ class SplitCreditNet:
         self.party_telecom = PartyBottomNet(
             party_id=3,
             party_name="Party3_Telecom",
-            input_dim=4,
+            input_dim=input_dims[2],
             hidden_dim=hidden_dim,
             embed_dim=embed_dim,
             defense=self.defense_config,

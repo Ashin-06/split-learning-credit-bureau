@@ -142,6 +142,7 @@ def evaluate_cut_layer_leakage(
     x_telecom_test: np.ndarray,
     model_name: str = "SplitCreditNet",
     ridge_alpha: float = 2.0,
+    feature_names: Tuple[Sequence[str], Sequence[str]] = (UPI_FEATURES, TELECOM_FEATURES),
 ) -> InversionAttackReport:
     """
     Run the semi-honest Coordinator Feature-Inversion Attack on Party 2 (UPI)
@@ -155,10 +156,10 @@ def evaluate_cut_layer_leakage(
     )
 
     upi_r2, upi_mse, upi_per_feat = _strongest_attack(
-        z2_tr, x_upi_train, z2_te, x_upi_test, UPI_FEATURES, ridge_alpha
+        z2_tr, x_upi_train, z2_te, x_upi_test, feature_names[0], ridge_alpha
     )
     tel_r2, tel_mse, tel_per_feat = _strongest_attack(
-        z3_tr, x_telecom_train, z3_te, x_telecom_test, TELECOM_FEATURES, ridge_alpha
+        z3_tr, x_telecom_train, z3_te, x_telecom_test, feature_names[1], ridge_alpha
     )
 
     overall_r2 = round(0.5 * (upi_r2 + tel_r2), 4)
