@@ -1,7 +1,8 @@
 """
 CLI entry point for splitbureau:
   - python -m splitbureau bench
-  - python -m splitbureau serve --port 8017
+  - python -m splitbureau serve      (settings: SPLITBUREAU_* environment variables, see ops.py)
+  - python -m splitbureau migrate    (apply database migrations to SPLITBUREAU_DATABASE_URL and exit)
   - python -m splitbureau realdata --data FILE   (UCI credit default data -> results/real_data.json)
 """
 
@@ -12,8 +13,6 @@ import json
 import os
 import sys
 from typing import Sequence
-
-import uvicorn
 
 from .bench import format_ablation, format_benchmark_report, run_ablation, run_full_benchmark
 
@@ -33,8 +32,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     bench_p.add_argument("--ablation", action="store_true", help="Also run the defence ablation")
 
     serve_p = sub.add_parser("serve", help="Start FastAPI server")
-    serve_p.add_argument("--host", type=str, default="127.0.0.1")
-    serve_p.add_argument("--port", type=int, default=8017)
+    serve_p.add_argument("--host", help="default SPLITBUREAU_HOST or 127.0.0.1; any other address needs API keys")
+    serve_p.add_argument("--port", type=int, help="default SPLITBUREAU_PORT or 8017")
+    sub.add_parser("migrate", help="apply database migrations to SPLITBUREAU_DATABASE_URL")
 
     real_p = sub.add_parser("realdata", help="Split learning on the UCI credit-card default data")
     real_p.add_argument("--data", required=True, help='"default of credit card clients.xls" (or a CSV export)')
@@ -49,11 +49,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(realdata(args.data, args.out, args.epochs)["models"], indent=2))
         return 0
 
+    if args.command == "migrate":
+        from . import db, ops
+
+        applied = db.migrate(db.engine(ops.load_settings().database_url))
+        print(*(applied or ["up to date"]), sep="\n")
+        return 0
+
     if args.command == "serve":
-        if args.host not in ("127.0.0.1", "localhost", "::1") and not os.environ.get("SPLITBUREAU_API_KEY"):
-            print("Refusing to listen on a non-loopback address without SPLITBUREAU_API_KEY set.", file=sys.stderr)
-            return 2
-        uvicorn.run("splitbureau.api:app", host=args.host, port=args.port, reload=False)
+        import uvicorn
+
+        from . import ops
+
+        for name, val in (("HOST", args.host), ("PORT", args.port)):
+            if val is not None:
+                os.environ[f"SPLITBUREAU_{name}"] = str(val)
+        try:
+            settings = ops.load_settings()  # fail here, before uvicorn, with a readable message
+        except ops.ConfigError as e:
+            sys.exit(f"configuration error: {e}")
+        ops.setup_logging(settings.log_level)
+        uvicorn.run("splitbureau.api:app", host=settings.host, port=settings.port, log_config=None, access_log=False)
         return 0
 
     # Default to `bench`

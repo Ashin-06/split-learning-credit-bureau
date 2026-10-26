@@ -41,7 +41,10 @@ def load(path: str | Path) -> tuple[Dict[str, np.ndarray], np.ndarray]:
     import pandas as pd  # only needed for the real data (.xls needs xlrd)
 
     df = pd.read_excel(path, header=1) if str(path).endswith(".xls") else pd.read_csv(path)
-    col = lambda c: np.sign(df[c].to_numpy(float)) * np.log1p(np.abs(df[c].to_numpy(float))) if c in AMOUNTS else df[c].to_numpy(float)
+
+    def col(c):
+        return np.sign(df[c].to_numpy(float)) * np.log1p(np.abs(df[c].to_numpy(float))) if c in AMOUNTS else df[c].to_numpy(float)
+
     return ({p: np.column_stack([col(c) for c in cols]) for p, cols in PARTIES.items()},
             df["default payment next month"].to_numpy(dtype=np.float64))
 
@@ -62,7 +65,9 @@ def experiments(path: str | Path, epochs: int = 160, seed: int = 42, log=print) 
     std, y_tr, y_te = split(parts, y, seed=seed)
     (b_tr, b_te), (u_tr, u_te), (t_tr, t_te) = std["bank"], std["bureau"], std["payments"]
     dims = tuple(len(c) for c in PARTIES.values())
-    keep = lambda m: {"roc_auc": m.roc_auc, "pr_auc": m.pr_auc, "brier": m.brier_score}
+
+    def keep(m):
+        return {"roc_auc": m.roc_auc, "pr_auc": m.pr_auc, "brier": m.brier_score}
 
     res = {"dataset": "UCI Default of Credit Card Clients (30,000 rows, CC BY 4.0)",
            "parties": PARTIES, "train_rows": len(y_tr), "test_rows": len(y_te),

@@ -54,7 +54,7 @@ def test_split_model_beats_bank_only(dataset) -> None:
 
 def test_api_endpoints() -> None:
     client = TestClient(app)
-    assert client.get("/health").status_code == 200
+    assert client.get("/healthz").status_code == 200
     r = client.post("/psi/align", json={})
     assert r.status_code == 200 and len(r.json()["matched_customer_ids_order"]) == 3
     r = client.post("/score", json={})
@@ -95,12 +95,16 @@ def test_defence_reduces_leakage_against_the_stronger_attacker(dataset) -> None:
 
 
 def test_api_key_and_limits(monkeypatch) -> None:
+    import importlib
+    import json
+
     import splitbureau.api as api
 
-    client = TestClient(app)
-    monkeypatch.setattr(api, "API_KEY", "s3cret")
+    monkeypatch.setenv("SPLITBUREAU_API_KEYS", json.dumps({"s3cret": {"user": "t", "role": "admin"}}))
+    api = importlib.reload(api)
+    client = TestClient(api.app)
     assert client.post("/score", json={}).status_code == 401
-    assert client.get("/health").status_code == 200
+    assert client.get("/healthz").status_code == 200
     hdr = {"X-API-Key": "s3cret"}
     assert client.post("/score", json={"savings_balance": -1}, headers=hdr).status_code == 422
     big = {"bank_ids": [f"ID{i}" for i in range(api.MAX_PSI_IDS + 1)], "upi_ids": ["a"]}
