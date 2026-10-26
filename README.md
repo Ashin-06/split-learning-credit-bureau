@@ -78,14 +78,27 @@ What the real data shows:
 ## Run it
 
 ```bash
-pip install -r requirements.txt
-python -m pytest -q                            # 9 tests
+pip install -r requirements-dev.lock && pip install -e .
+python -m pytest -q                            # 34 tests
 python -m splitbureau bench --ablation         # about 40 s
-python -m splitbureau realdata --data FILE     # UCI credit default data, about 2.5 minutes
-python -m splitbureau serve --port 8017        # API + console at http://127.0.0.1:8017
+python -m splitbureau realdata --data FILE     # UCI credit default data, about 2.5 minutes (pip install -e ".[realdata]")
+python -m splitbureau serve                    # API + console at http://127.0.0.1:8017
 ```
 
-Endpoints: `POST /psi/align`, `POST /train`, `POST /score`, `GET /bench`, `GET /health`. Set `SPLITBUREAU_API_KEY` to require it in the `X-API-Key` header (the console has a field for it). Without the key the server runs open, and `serve` refuses to bind a non-loopback address. The server plays all three parties, so `/score` and `/train` do receive every party's raw features. The score, tier and decision it returns are illustrative only.
+Endpoints: `POST /psi/align`, `POST /train`, `POST /score`, `GET /bench`, plus `GET /healthz`, `GET /readyz` and `GET /metrics`. The server plays all three parties, so `/score` and `/train` do receive every party's raw features. The score, tier and decision it returns are illustrative only.
+
+**Settings and access.** The service reads `SPLITBUREAU_*` environment variables (see `docs/runbook.md`). Callers send an API key in `X-API-Key` (the console has a field for it) or `Authorization: Bearer`. Each key has a role: `lender` scores, `data_scientist` also trains and runs PSI, `monitor` reads metrics, `admin` can do everything including the benchmark. `python -m splitbureau.ops keygen` makes a key and the hash to configure. Without keys the service runs open in development and refuses to listen on anything but loopback; `SPLITBUREAU_ENV=production` refuses to start without hashed keys and a database.
+
+**State.** Trained models and a log of every score (user, customer reference, model version, probability, decision; no features) are kept in SQLite or Postgres (`SPLITBUREAU_DATABASE_URL`). An empty database gets the default model, trained on synthetic data, on first use. `/train` stores a new version and `/score` always uses the newest, so a restart serves the same model and replicas share it.
+
+**Docker.**
+
+```bash
+docker build -t split-learning-credit-bureau:1.0.0 .
+docker run -d -p 8017:8017 -v splitbureau-data:/data -e SPLITBUREAU_API_KEYS='{"sha256:...": {"user": "ops", "role": "admin"}}' split-learning-credit-bureau:1.0.0
+```
+
+The image runs in production mode as a non-root user. Run without keys it exits with a configuration error.
 
 ## Limits
 
@@ -93,4 +106,25 @@ Endpoints: `POST /psi/align`, `POST /train`, `POST /score`, `GET /bench`, `GET /
 - **No formal privacy guarantee.** There's no differential-privacy accounting and only two attack decoders. Label leakage through the gradients the bank sends back is not addressed.
 - **Semi-honest PSI only.** A malicious party could send malformed tokens or lie about its set, and hashing is not constant-time.
 - **Features have fairness and legal problems.** Late-night betting share, handset price tier and similar alternative data raise discrimination and consent issues that a real lender would need to clear with regulators and fair-lending review before use.
-- **No deployment story**: no TLS, no per-party authentication, no model versioning or audit trail.
+- **One service plays every party.** There is no transport between parties and no per-party authentication; TLS is left to the ingress.
+
+## Production readiness
+
+In place (1.0.0):
+- Settings checked at startup; production refuses to start without hashed API keys and a database, and never listens publicly without keys.
+- API keys with roles, per-client rate limit, request body cap, security headers, CORS only for listed origins, validation errors that don't echo input.
+- Models versioned in a database (no pickle) and a score log recording user, model version and decision; SQLite or Postgres, with migrations.
+- JSON logs with request IDs, `/healthz`, `/readyz`, Prometheus `/metrics`.
+- Pinned dependency locks, a non-root container image with a health check, CI running ruff, bandit, pip-audit and the tests.
+- `SECURITY.md`, `docs/threat-model.md`, `docs/runbook.md`, `docs/model-card.md`.
+
+Still needed before real use:
+- A cryptographer's review of the PSI protocol (production mode logs a warning until then), and a malicious-secure protocol if parties can't be trusted to follow it.
+- A formal privacy analysis of the cut-layer defence (differential-privacy accounting, stronger attacks, gradient label leakage).
+- Separate deployments per party with authenticated transport, instead of one service holding everyone's data.
+- An independent security review and penetration test.
+- Validation on the bank's own data, plus fairness and lawful-use review of every feature.
+- RBI and DPDP Act 2023 sign-off (consent for sharing data between the bank, payments app and telecom, purpose limitation, credit-information rules).
+- Real integrations: the parties' data pipelines and the lender's decision system.
+- HSM/KMS-backed key storage if signing or encryption keys are added, and managed secrets for the API key file.
+- An on-call team, SLOs and alerting wired to the metrics above.
