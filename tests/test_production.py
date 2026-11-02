@@ -183,13 +183,27 @@ def test_json_logs_carry_request_ids(capsys):
 
 def test_production_warns_that_the_psi_is_unreviewed(monkeypatch, tmp_path, capsys):
     env = {k.removeprefix("SPLITBUREAU_"): v for k, v in prod_env(SPLITBUREAU_DATABASE_URL=f"sqlite:///{tmp_path / 'p.db'}").items()}
-    api = boot(monkeypatch, **env)
+    api = boot(monkeypatch, **env, ACCEPT_UNREVIEWED_CRYPTO="yes")
     warnings = [json.loads(line) for line in capsys.readouterr().out.splitlines() if "UNREVIEWED" in line]
     assert warnings and warnings[0]["level"] == "WARNING" and "cryptographer" in warnings[0]["msg"]
     assert api.registry.newest_version() == 1  # the model is trained before the first request
     r = TestClient(api.app).post("/psi/align", json={}, headers={"x-api-key": KEY})
     assert r.status_code == 403  # lender
     assert "reviewed" in api.PSI_WARNING
+
+
+def test_production_refuses_unreviewed_crypto_without_consent(monkeypatch, tmp_path):
+    env = {k.removeprefix("SPLITBUREAU_"): v for k, v in prod_env(SPLITBUREAU_DATABASE_URL=f"sqlite:///{tmp_path / 'c.db'}").items()}
+    with pytest.raises(ops.ConfigError, match="SPLITBUREAU_ACCEPT_UNREVIEWED_CRYPTO=yes"):
+        boot(monkeypatch, **env)
+    with pytest.raises(ops.ConfigError, match="reviewed by a cryptographer"):
+        boot(monkeypatch, **env, ACCEPT_UNREVIEWED_CRYPTO="no")
+    # through `serve` too: the error is raised while uvicorn imports the app
+    run_env = {k: v for k, v in os.environ.items() if not k.startswith("SPLITBUREAU_")}
+    run_env.update(prod_env(SPLITBUREAU_DATABASE_URL=f"sqlite:///{tmp_path / 'c.db'}"))
+    r = subprocess.run([sys.executable, "-m", "splitbureau", "serve", "--port", "1"], env=run_env,
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode != 0 and "configuration error" in r.stderr and "ACCEPT_UNREVIEWED_CRYPTO" in r.stderr
 
 
 def _url(tmp_path):

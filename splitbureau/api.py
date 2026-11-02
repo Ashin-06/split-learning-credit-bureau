@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import os
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -48,6 +49,9 @@ PSI_WARNING = ("the PSI protocol is hand-written and has not been reviewed by a 
 
 settings = ops.load_settings()
 ops.setup_logging(settings.log_level)
+# before touching the database, so a refused start leaves no trace
+if settings.production and os.environ.get("SPLITBUREAU_ACCEPT_UNREVIEWED_CRYPTO", "").strip().lower() != "yes":
+    raise ops.ConfigError(PSI_WARNING + "; set SPLITBUREAU_ACCEPT_UNREVIEWED_CRYPTO=yes to run anyway")
 store = db.connect(settings.database_url)
 registry = Registry(store)
 if settings.production:

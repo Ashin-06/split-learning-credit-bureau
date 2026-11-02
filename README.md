@@ -23,7 +23,8 @@ To run it in a container:
 ```bash
 docker build -t split-learning-credit-bureau .
 docker run -d -p 8017:8017 -v splitbureau-data:/data \
-  -e SPLITBUREAU_API_KEYS='{"sha256:...": {"user": "ops", "role": "admin"}}' split-learning-credit-bureau
+  -e SPLITBUREAU_API_KEYS='{"sha256:...": {"user": "ops", "role": "admin"}}' \
+  -e SPLITBUREAU_ACCEPT_UNREVIEWED_CRYPTO=yes split-learning-credit-bureau
 ```
 
 ## API
@@ -52,6 +53,7 @@ Without the defence, an attacker can rebuild the other parties' data almost exac
 | Variable | Purpose |
 |---|---|
 | `SPLITBUREAU_ENV=production` | refuse to start without hashed API keys and a database |
+| `SPLITBUREAU_ACCEPT_UNREVIEWED_CRYPTO=yes` | required in production: acknowledges that the PSI protocol is hand-written and unreviewed |
 | `SPLITBUREAU_API_KEYS` / `SPLITBUREAU_KEYS_FILE` | hashed API keys with roles |
 | `SPLITBUREAU_DATABASE_URL` | `sqlite:///...` or `postgresql://...` |
 
@@ -65,3 +67,7 @@ Without the defence, an attacker can rebuild the other parties' data almost exac
 - The code has not had an independent security review.
 
 See [SECURITY.md](SECURITY.md), [docs/threat-model.md](docs/threat-model.md) and [docs/model-card.md](docs/model-card.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

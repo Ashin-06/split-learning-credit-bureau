@@ -8,6 +8,7 @@ How to deploy, configure and operate the bureau service. Commands assume the rep
 docker build -t split-learning-credit-bureau:1.0.0 .
 python -m splitbureau.ops keygen          # one API key per client; keep only the hash
 docker run -d --name splitbureau -p 8017:8017 -v splitbureau-data:/data \
+  -e SPLITBUREAU_ACCEPT_UNREVIEWED_CRYPTO=yes \
   -e SPLITBUREAU_KEYS_FILE=/run/secrets/splitbureau-keys.json \
   split-learning-credit-bureau:1.0.0
 curl -fsS http://127.0.0.1:8017/readyz
@@ -29,6 +30,7 @@ Without Docker: `pip install -r requirements.lock && pip install -e .`, then `sp
 | Variable | Required in production | Meaning |
 |---|---|---|
 | `SPLITBUREAU_ENV` | — | `development` (default) or `production` |
+| `SPLITBUREAU_ACCEPT_UNREVIEWED_CRYPTO` | `yes` | acknowledges that the PSI protocol has not been reviewed by a cryptographer; production refuses to start without it |
 | `SPLITBUREAU_API_KEYS` / `SPLITBUREAU_KEYS_FILE` | yes | JSON `{"sha256:<hex>": {"user": "...", "role": "..."}}`. Roles: `lender` (`/score`), `data_scientist` (`/score`, `/train`, `/psi/align`), `monitor` (`/metrics`), `admin` (all, plus `/bench`) |
 | `SPLITBUREAU_DATABASE_URL` | yes | `sqlite:////data/splitbureau.db` or `postgresql://...` (default in development: in memory) |
 | `SPLITBUREAU_HOST`, `SPLITBUREAU_PORT` | — | default `127.0.0.1:8017`; any non-loopback address needs API keys |

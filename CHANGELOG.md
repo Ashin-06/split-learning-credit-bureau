@@ -2,6 +2,14 @@
 
 All notable changes to this project. Versions follow [semantic versioning](https://semver.org/).
 
+## 1.0.1 — 2026-11-02
+
+### Changed
+- Production mode now refuses to start unless `SPLITBUREAU_ACCEPT_UNREVIEWED_CRYPTO=yes`, because
+  the PSI protocol is hand-written and has not been reviewed by a cryptographer. The check runs before the
+  database is touched, and `serve` exits with a readable `configuration error`.
+- MIT licence.
+
 ## 1.0.0 — 2026-10-26
 
 ### Added
