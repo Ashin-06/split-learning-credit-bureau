@@ -11,7 +11,7 @@ All three parties run in one process. The main benchmark uses synthetic data; th
 ## Quick start
 
 ```bash
-pip install -r requirements-dev.lock && pip install -e .
+python -m pip install -r requirements-dev.lock && python -m pip install -e .
 python -m pytest -q                            # 34 tests
 python -m splitbureau bench --ablation         # about 40 s
 python -m splitbureau realdata --data FILE     # UCI credit default data, about 2.5 minutes
