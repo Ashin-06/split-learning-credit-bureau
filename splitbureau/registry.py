@@ -40,7 +40,7 @@ def _now() -> str:
 class Registry:
     def __init__(self, engine: Engine):
         self.db = engine
-        self._lock = threading.Lock()  # ponytail: per process; other replicas are caught by the primary key
+        self._lock = threading.Lock()  # Per process; other replicas are caught by the primary key
 
     def save(self, model: SplitCreditNet, stats: dict, metrics: dict, user: str) -> int:
         """Store a trained model as the next version and return that version."""
