@@ -347,12 +347,12 @@
       ];
       document.getElementById('bench-tbody').innerHTML = rows.map(r => `
         <tr>
-          <td><strong>${r.name}</strong></td>
+          <td><strong>${esc(r.name)}</strong></td>
           <td class="metric-val">${r.roc.toFixed(4)}</td>
           <td class="metric-val">${r.pr.toFixed(4)}</td>
           <td class="metric-val">${r.brier.toFixed(4)}</td>
           <td class="metric-val ${r.r2 > 0.5 ? 'bad' : 'good'}">${r.r2.toFixed(4)}</td>
-          <td class="metric-val">${r.dcor}</td>
+          <td class="metric-val">${esc(r.dcor)}</td>
           <td><span class="${r.r2 > 0.5 ? 'bad' : 'good'}">${esc(r.verdict)}</span></td>
         </tr>
       `).join('');
